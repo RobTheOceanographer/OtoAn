@@ -7,34 +7,46 @@ options(java.parameters = "-Xmx4g" ) # gets around java memory limits.
 library("XLConnect")
 
 filename <- "/home/dev/projects/otoAn/exampleInputData/BLOCK 33.xls"
-# Read the workbook 
+# Read the workbook
 wb_object<-loadWorkbook(filename)
 
 # Save each sheet's name as a vector
 wb_sheets <-getSheets(wb_object)
 
-tab_index <- which(wb_sheets == "Calibration regressions")
+tabRefName = "Calibration regressions"
+tab_indexStart <- which(wb_sheets == tabRefName) +1
 
 # extract a sheet into a data frame.
 #dat <- readWorksheet(wbObject, sheet = getSheets(wbObject))
+tab_indexList = tab_indexStart:length(wb_sheets)
 
-dat <- readWorksheet(wb_object, sheet = wb_sheets[10], header = TRUE)
+for (tab_index in tab_indexList) {
+  cat(paste("..", (tab_index - tab_indexStart)+1 , ".."))
+  tabDat <- readWorksheet(wb_object, sheet = wb_sheets[tab_index], header = TRUE)
+  
+  plot(tabDat$Time..sec., tabDat$BS.Ca43, type="l", lwd=4)
+  title(wb_sheets[tab_index])
+  xy <- identify(tabDat$Time..sec., tabDat$BS.Ca43)
+  # lines(tabDat$Time..sec.[xy[1]:xy[2]],tabDat$BS.Ca43[xy[1]:xy[2]],col="red",lwd=6)
 
+  # chop the columns that contain 'mol' (that's the grep bit) based on user input (that's th exy stuff) indices.
 
-plot(dat$Time..sec., dat$BS.Ca43, type="l", lwd=4)
-xy <- identify(dat$Time..sec., dat$BS.Ca43)
-
-lines(dat$Time..sec.[xy[1]:xy[2]],dat$BS.Ca43[xy[1]:xy[2]],col="red",lwd=6)
-
-# install.packages("stringr")
-library(stringr)
-#str_locate(colnames(dat)[i], "mol") 
-d <- lapply(seq_along(colnames(dat)),function(i) str_locate(colnames(dat)[i], "mol")[1])
-d1 <- lapply(seq_along(d), function(ii) !is.na(as.numeric(d[ii])))
-
-d2<-matrix(d1)
-
-colnames(dat)
-dat[d1]
+  subTabDat_molCols <- tabDat[xy[1]:xy[2],grep("mol", colnames(tabDat))]
+  subTabDat_molCols$time <- tabDat$Time..sec.[xy[1]:xy[2]]
+  
+  #remove the dots from the col names.
+  names(subTabDat_molCols) <- gsub(x = names(subTabDat_molCols),
+     pattern = "\\.",
+     replacement = "_")
+  # remove the trailing _
+  names(subTabDat_molCols) <- gsub("_$","", names(subTabDat_molCols), perl=T)
+  # remove double _
+  names(subTabDat_molCols) <- gsub("__","_", names(subTabDat_molCols), perl=T)
+  
+  # plot(subTabDat_molCols$time, subTabDat_molCols$Li7_Ca43_umol_mol,type='l')
+  #savename = gsub(" ", "", paste("TRIMMED_", basename(filename), ".csv"))
+  savename = gsub(" ", "", paste(filename,"_TRIMMED_",wb_sheets[tab_index],".csv"))
+  write.csv(subTabDat_molCols, file = savename,row.names=FALSE)
+}
 
 
